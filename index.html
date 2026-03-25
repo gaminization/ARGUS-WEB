@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ARGUS-X SIM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="root">
+      <header class="topbar card">
+        <div>
+          <h1>ARGUS-X SIM</h1>
+          <p>Autonomous Radar-Based Rescue Robot</p>
+        </div>
+        <div class="controls">
+          <button id="btnStart">Start</button>
+          <button id="btnPause">Pause/Resume</button>
+          <button id="btnReset">Reset</button>
+          <button id="btnReplay">Live/Replay (P)</button>
+          <button id="btnClearLogs">Clear Logs (C)</button>
+        </div>
+        <div class="speed-wrap">
+          <label>Speed
+            <input id="speedCtrl" type="range" min="0.5" max="4" value="1" step="0.1" />
+          </label>
+          <label>Replay Scrub
+            <input id="scrubCtrl" type="range" min="0" max="100" value="0" step="0.1" />
+          </label>
+        </div>
+      </header>
+
+      <section class="main-grid">
+        <div class="left card">
+          <h2>World View</h2>
+          <canvas id="worldView" width="800" height="800"></canvas>
+        </div>
+
+        <div class="right card">
+          <h2>Persistent Map</h2>
+          <canvas id="mapView" width="400" height="400"></canvas>
+
+          <div class="hud">
+            <div><span>STATE</span><strong id="hudMode">LIVE:EXPLORE</strong></div>
+            <div><span>SIGNAL</span><strong id="hudSignal">0.00</strong></div>
+            <div><span>MAX PROB</span><strong id="hudMaxProb">0.00</strong></div>
+            <div><span>TARGETS FOUND</span><strong id="hudFound">0/0</strong></div>
+            <div><span>GPS</span><strong id="hudGps">0,0</strong></div>
+            <div><span>COVERAGE</span><strong id="hudCoverage">0%</strong></div>
+            <div><span>SCORE</span><strong id="hudScore">0</strong></div>
+            <div><span>TIME</span><strong id="hudTime">0s</strong></div>
+          </div>
+
+          <div class="hotkeys">
+            <span>SPACE pause</span>
+            <span>R reset</span>
+            <span>P replay</span>
+            <span>←/→ scrub</span>
+            <span>ESC halt</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="bottom card">
+        <h2>Structured Logs</h2>
+        <pre id="logOutput"></pre>
+      </section>
+    </div>
+
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>
