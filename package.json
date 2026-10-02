@@ -1,0 +1,31 @@
+{
+  "name": "argus-sim",
+  "version": "1.0.0",
+  "description": "Autonomous radar-based search & rescue robot simulation with hardware-realistic sensing in GPS-denied and vision-obscured environments.",
+  "type": "module",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "dev": "python3 -m http.server 8080",
+    "serve": "npx serve .",
+    "check": "node --check src/main.js && node --check src/navigation.js && node --check src/mapping.js"
+  },
+  "keywords": [
+    "robotics",
+    "autonomous-navigation",
+    "radar-simulation",
+    "rescue-robotics",
+    "artificial-potential-fields",
+    "occupancy-grid",
+    "search-and-rescue",
+    "mmwave-radar",
+    "frontier-exploration"
+  ],
+  "author": "ARGUS Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gaminization/ARGUS-SIM.git"
+  },
+  "homepage": "https://github.com/gaminization/ARGUS-SIM#readme"
+}

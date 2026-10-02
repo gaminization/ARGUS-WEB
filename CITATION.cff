@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use ARGUS-SIM in academic research or technical demonstrations, please cite it as below."
+title: "ARGUS-X: Autonomous Radar-Centric Search & Rescue Robot Simulation"
+authors:
+  - name: "ARGUS Robotics Team"
+repository-code: "https://github.com/gaminization/ARGUS-SIM"
+keywords:
+  - "autonomous navigation"
+  - "search and rescue"
+  - "mmwave radar"
+  - "artificial potential fields"
+  - "occupancy grid"
+  - "robotics simulation"
+license: "MIT"
+version: "1.0.0"
+date-released: "2026-10-02"
