@@ -2,32 +2,36 @@
 
 This document specifies the physical hardware architecture, sensor bill of materials (BOM), electrical topology, and sim-to-real translation parameters for deploying the **ARGUS-X** autonomous navigation stack on physical robotic hardware.
 
+> **Intellectual Property Notice**: This hardware specification details the physical robotics platform designed by **Garv Arora** (under the academic guidance of **Prof. Padma Priya R** at **Vellore Institute of Technology**) for the ARGUS platform, patented under **Indian Patent Publication IN202641072249 A1** (*"Autonomous radar-guided survivor detection and navigation system"*), filed on 10 June 2026 and published on 19 June 2026.
+
 ---
 
-## 1. System Overview & Physical Design Philosophy
+## 1. System Overview & Physical Design Philosophy (Patent System 10)
 
 ARGUS-X is engineered for search-and-rescue operations inside disaster zones (collapsed concrete structures, industrial fires, rubble voids, mine tunnels). In such environments:
 - **LiDAR** fails due to severe optical backscattering from smoke, steam, and airborne concrete dust.
 - **RGB/Depth Cameras** fail due to pitch-black conditions and particulate occlusion.
 - **GPS** is completely denied by subterranean voids and heavy reinforced concrete.
 
-To overcome these constraints, ARGUS-X relies on **millimeter-wave (mmWave) FMCW radar** operating at $24\text{ GHz}$, capable of penetrating dust, drywall, and smoke while capturing sub-millimeter chest wall movements associated with human respiration.
+To overcome these constraints, ARGUS-X relies on **millimeter-wave (mmWave) FMCW radar (`110`)** operating at $24\text{ GHz}$, capable of penetrating non-metallic dust, drywall, and smoke while capturing sub-millimeter chest wall movements associated with human respiration.
+
+Navigation requires **no SLAM, no camera, and no LiDAR (Claim 6)**, instead combining ultrasonic wall-following (`120`) and IMU dead reckoning (`130`) executed locally on a resource-constrained embedded processor (`140`).
 
 ---
 
-## 2. Bill of Materials (BOM)
+## 2. Bill of Materials (BOM) & Patent Reference Numerals
 
-| Component | Model / Part | Interface | Function in ARGUS-X |
+| Component & Numeral | Model / Part | Interface | Function & Patent Specifications |
 | :--- | :--- | :--- | :--- |
-| **Primary Controller / SBC** | Espressif ESP32-S3-WROOM-1 OR Raspberry Pi 4 Model B (4GB) | SPI / UART / I2C | Runs navigation state machine, APF planner, and serial sensor bridges. |
-| **mmWave FMCW Radar** | Hi-Link HLK-LD2410C ($24\text{ GHz}$) | UART ($256000\text{ baud}$) | Detects micro-motion (respiration) through dust/debris up to $6\text{ m}$. |
-| **Ultrasonic Ranging (3x)** | HC-SR04P / RCWL-1601 ($3.3\text{V}$ compatible) | GPIO (Trigger/Echo) | Obstacle boundary detection and local wall-following (front, $\pm 45^\circ$). |
-| **6-DoF IMU** | InvenSense MPU-6050 (or ICM-20948) | I2C ($400\text{ kHz}$) | High-rate orientation estimation, yaw tracking, and angular velocity. |
-| **Drivetrain Motors (2x)** | 12V DC Metal Gearmotors (30:1, $250\text{ RPM}$) | Quadrature Encoders | Differential-drive locomotion with wheel odometry feedback. |
-| **Motor Driver** | Toshiba TB6612FNG Dual H-Bridge | PWM / Digital IO | Efficient low-heat motor velocity and directional control. |
-| **Power Supply** | 3S 11.1V $2200\text{ mAh}$ 25C LiPo Battery | XT60 | Provides high-current power for drivetrain and onboard computation. |
+| **Mobile Robot Chassis (`100`)** | Custom Acrylic / Aluminum Robotic Chassis | Mechanical | Structural platform housing sensors, compute, battery, and locomotion. |
+| **Radar Sensor (`110`)** | Hi-Link HLK-LD2410C ($24\text{ GHz}$ FMCW) | UART ($256000\text{ baud}$) | Top-mounted for unobstructed FOV. Detects breathing micro-motion through walls/rubble. $P_d \approx 0.85, P_{fa} \approx 0.05$. Static target range $\approx 0.72\text{ m}$, moving $\approx 0.30\text{ m}$. |
+| **Ultrasonic Sensors (`120`)** | 3x HC-SR04 / RCWL-1601 ($3.3\text{V}$ compatible) | GPIO (Trigger/Echo) | Obstacle boundary detection and right-hand wall-following (front, left, right). Range $2\text{--}400\text{ cm}$. |
+| **Inertial Measurement Unit (`130`)** | InvenSense MPU-6050 (or ICM-20948) | I2C ($400\text{ kHz}$) | Mounted adjacent to radar sensor 110 to synchronize heading with radar sampling during directional sweeps; dead-reckoning navigation. |
+| **Processing Unit (`140`)** | Espressif ESP32-S3 Dual-Core ($240\text{ MHz}$) | SPI / UART / I2C | Dual-core processing operating under $200\text{ KB}$ RAM constraints; **100% local edge processing with zero cloud dependency**. |
+| **Drive Mechanism (`150`)** | 12V DC Metal Gearmotors + L298N Driver | PWM / Digital IO | Differential-drive locomotion with wheels at lower portion of chassis. |
+| **GPS Module** | NEO-6M / NEO-8M GNSS Module | UART ($9600\text{ baud}$) | Outputs NMEA strings (lat, lon, timestamp) logged strictly upon survivor confirmation in Logging State. |
+| **Power Source** | 3S 11.1V $2200\text{ mAh}$ Li-ion / LiPo Battery | XT60 | Located beneath mobile robot chassis base for low center of gravity. |
 | **Voltage Regulation** | 2x LM2596 DC-DC Buck Regulators | Input: 12V, Out: 5V/3A & 3.3V/2A | Clean, decoupled power rails for compute and analog sensor suites. |
-| **Chassis Platform** | Heavy-duty Aluminum Tracked or Skid-Steer Chassis | Mechanical | High-clearance navigation across rubble, pipes, and broken masonry. |
 
 ---
 
@@ -35,7 +39,7 @@ To overcome these constraints, ARGUS-X relies on **millimeter-wave (mmWave) FMCW
 
 ```
 +-----------------------------------------------------------------+
-|                       11.1V 3S LiPo Battery                     |
+|              Under-Chassis Power: 11.1V 3S LiPo Battery         |
 +-------------------------------+---------------------------------+
                                 |
                 +---------------+---------------+
@@ -43,18 +47,20 @@ To overcome these constraints, ARGUS-X relies on **millimeter-wave (mmWave) FMCW
        [Step-Down 5V/3A]               [Step-Down 3.3V/2A]
                 |                               |
 +---------------+---------------+       +-------+-------+
-|  Raspberry Pi 4 / ESP32-S3   |       | Sensor Bus    |
+| Processing Unit 140 (ESP32)   |       | Sensor Bus    |
 +---------------+---------------+       +-------+-------+
         | UART (GPIO 14/15)                     |
-        +---> Hi-Link HLK-LD2410C Radar         |
+        +---> Radar Sensor 110 (HLK-LD2410C)    |
         | I2C (SDA/SCL)                         |
-        +---> InvenSense MPU-6050 IMU <---------+
+        +---> IMU 130 (MPU-6050 adjacent to 110)|
         | GPIO (Trig/Echo x 3)                  |
-        +---> Front Ultrasonic (HC-SR04P) <-----+
-        +---> Left 45° Ultrasonic <-------------+
-        +---> Right 45° Ultrasonic <------------+
+        +---> Front Ultrasonic 120 (HC-SR04) <--+
+        +---> Left Ultrasonic 120 (HC-SR04) <---+
+        +---> Right Ultrasonic 120 (HC-SR04) <--+
+        | UART 2 (RX/TX)                        |
+        +---> GPS Module (NMEA Logging)         |
         | PWM / Direction                       |
-        +---> TB6612FNG Dual Driver             |
+        +---> L298N Motor Driver (Drive 150)    |
                 | Motor Power (12V Rail)        |
                 +---> Left Wheel Motor          |
                 +---> Right Wheel Motor         |

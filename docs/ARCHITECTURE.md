@@ -2,46 +2,53 @@
 
 This document outlines the software architecture, data pipelines, module interactions, and execution lifecycle of the **ARGUS-X** autonomous search-and-rescue simulation.
 
+> **Intellectual Property Notice**: This document details the **original robotics system architecture and simulation platform created by Garv Arora** (under the academic guidance of **Prof. Padma Priya R** at **Vellore Institute of Technology**). This software and simulation framework served as the foundational reduction to practice and experimental basis for **Indian Patent Application IN202641072249 A1** (*"Autonomous radar-guided survivor detection and navigation system"*), filed on 10 June 2026 and published on 19 June 2026.
+
 ---
 
-## 1. High-Level System Architecture
+## 1. High-Level System Architecture (Patent System 10)
 
-ARGUS-X is designed as a modular, decoupled autonomous robotics simulation built purely on modern web standards (ES6 modules and HTML5 Canvas 2D). It models an autonomous ground vehicle (AGV) deployed in collapsed structures or subterranean voids where optical vision and LiDAR sensors fail due to airborne particulates (smoke, dust, mist).
+ARGUS-X is designed as a modular, decoupled autonomous robotics simulation built purely on modern web standards (ES6 modules and HTML5 Canvas 2D). It models an autonomous ground vehicle (AGV) deployed in collapsed structures or subterranean voids where optical vision, LiDAR, and GPS fail catastrophically:
+- **LiDAR** fails due to severe airborne dust and particulate backscatter.
+- **Cameras** fail due to zero-lux conditions and non-line-of-sight rubble obstruction.
+- **GPS** is attenuated by reinforced concrete slabs and earth.
+
+To solve this, the architecture designed by Garv Arora—which forms the basis of **System (10)** in Indian Patent IN202641072249 A1—combines a 24 GHz mmWave radar module (`110`), a 3-transducer ultrasonic sonar array (`120`), and an inertial measurement unit (`130`) coupled to an embedded processing unit (`140`) running a probabilistic confidence grid (`200`) and a threshold-driven state machine—**completely free from SLAM, cameras, or LiDAR (Claim 6)**.
 
 ```mermaid
 flowchart TD
-    subgraph Physics & World
-        ENV[Procedural Environment] -->|Ground Truth Geometry| SENS[Sensor Suite]
-        ROBOT[Robot Chassis Kinematics] -->|True Pose (x, y, θ)| SENS
+    subgraph Physical Chassis 100 & Environment
+        ENV[Procedural Rubble Environment] -->|Debris Geometry & Raycast| SENS[Sensor Suite]
+        ROBOT[Chassis Kinematics & Drive 150] -->|True Pose x, y, θ| SENS
     end
 
-    subgraph Perception & State Estimation
-        SENS -->|Noisy Sonar Rays| MAP[Mapping System]
-        SENS -->|Radar RSSI + Direction| MAP
-        SENS -->|Radar Detection Event| FSM[Behavior State Machine]
-        SENS -->|Gyro Yaw & Drift| ROBOT
-        SENS -->|Noisy GPS (Telemetry Only)| HUD[HUD & Telemetry]
-        MAP -->|Occupancy & Visited Grids| NAV[Navigation Engine]
-        MAP -->|Survivor Clusters| FSM
+    subgraph Perception & State Estimation (140)
+        SENS -->|120: Ultrasonic Distances Front, ±45°| MAP[200: Probabilistic Grid Map]
+        SENS -->|110: Radar Returns & Breathing Doppler| MAP
+        SENS -->|110: Detection Trigger Threshold| FSM[Behavior State Machine]
+        SENS -->|130: IMU Heading with Drift| ROBOT
+        SENS -->|NMEA UART GPS Telemetry| HUD[HUD & Telemetry]
+        MAP -->|Occupancy & Visited Arrays| NAV[Navigation Engine]
+        MAP -->|Survivor Clusters & Centroids| FSM
         MAP -->|Target Hotspots| NAV
     end
 
-    subgraph Decision & Planning
-        FSM -->|Current State| NAV
+    subgraph Decision & Planning (140)
+        FSM -->|Tactical State: Explore / Track / Confirm| NAV
         NAV -->|Repulsion, Goal, Radar APF| CTRL[PID Motion Controller]
         NAV -->|Frontier A* Path| CTRL
     end
 
-    subgraph Actuation & Feedback
-        CTRL -->|Linear & Angular Commands| ROBOT
+    subgraph Actuation & Feedback (150)
+        CTRL -->|Differential Motor PWM Commands| ROBOT
         ROBOT -->|Integrated Velocity| ENV
     end
 
     subgraph Diagnostics & Replay
-        ROBOT --> LOG[Logger & HUD]
+        ROBOT --> LOG[Circular Telemetry Logger]
         MAP --> LOG
         FSM --> LOG
-        ROBOT --> REP[Replay Ring Buffer]
+        ROBOT --> REP[14,000-Frame Replay Buffer]
         MAP --> REP
         ENV --> RENDER[Dual-Canvas Renderer]
         MAP --> RENDER
@@ -113,12 +120,19 @@ The environment is mapped onto an internal discrete grid of $100 \times 100$ cel
 - **`visited` (`Float32Array`)**: Records cumulative occupancy count per cell to calculate coverage and penalize path revisits.
 - **`explored` (`Uint8Array`)**: Binary mask indicating cells cleared by raycasts or vehicle passage.
 - **`obstacle` (`Uint8Array`)**: Marks verified obstacle hits detected at ultrasonic termination points.
-- **`prob` (`Float32Array`)**: Spatial Bayesian probability density representing likelihood of survivor presence.
+- **`prob` (`Float32Array`)**: Spatial Bayesian probability density representing likelihood of survivor presence. Updated per Patent Claim 4:
+  $$C = \min(1.0, \; C + 0.12 \times r), \quad \text{decay: } C = \max(0, \; C - \beta \times \Delta t)$$
 - **`ambient` (`Float32Array`)**: Non-zero baseline spatial noise floor ensuring uncertainty never drops to an unrealistic zero prior.
-- **Spatial Clustering**: Evaluates cells with confidence exceeding $0.56$, grouping contiguous regions via 8-connected flood-fill into weighted centroid clusters $(x, y, \text{confidence}, \text{size})$.
+- **Spatial Clustering (Claim 8)**: Evaluates cells with confidence exceeding threshold ($P \ge 0.56$), grouping contiguous regions via 8-connected flood-fill into weighted centroid clusters $(x, y, \text{confidence}, \text{size})$.
 
-### 3.4. Behavioral Finite State Machine (`src/stateMachine.js`)
-Controls tactical mission autonomy via five distinct behavioral modes:
+### 3.4. Behavioral State Machine (Patent Claim 2 Mapping)
+The high-level state machine disclosed in **Indian Patent IN202641072249 A1** comprises three fundamental operational states: **Exploration State**, **Confirmation State**, and **Logging State**. In this simulation, these are implemented via a five-phase real-time tactical state machine:
+
+| Patent State (Claim 2) | Simulation Mode | Operational Role | Transition Conditions |
+| :--- | :--- | :--- | :--- |
+| **Exploration State** | `EXPLORE` & `WALL_FOLLOW` | Systematic debris field coverage using right-hand wall-following via ultrasonic sensors (`120`) and heading estimation from IMU (`130`). | Transitions to Confirmation when radar confidence exceeds 1st threshold ($C \ge 0.72$). |
+| **Confirmation State** | `TRACK` & `CONFIRM` | Halts exploration; executes multi-angle directional sweep across $[-90^\circ, \dots, +90^\circ, 180^\circ]$ and triangulation. | If confidence persists $\ge$ 2nd threshold $\to$ Logging; if signal lost $\to$ Exploration. |
+| **Logging State** | Confirmation / Marker Output | Records target coordinates $(x, y)$, fetches GPS NMEA data, and updates rescue priority ranking. | Resumes Exploration to detect remaining victims. |
 
 ```mermaid
 stateDiagram-v2
@@ -142,7 +156,14 @@ stateDiagram-v2
     }
 ```
 
-### 3.5. Hybrid Navigation & Motion Control (`src/navigation.js` & `src/robot.js`)
+### 3.5. Periodic 10 Hz Control Loop (Patent Claim 9 & FIG. 3)
+Per patent paragraph [0074] and FIG. 3, each iteration of the primary control cycle executes:
+1. **Radar Ingestion & Range-Doppler Cell Mapping**: Receives micro-motion respiration reflections from radar sensor 110.
+2. **Confidence Grid Update**: Increases cell confidence ($C + 0.12 \times r$) or decays unconfirmed cells ($C - \beta \Delta t$).
+3. **Ultrasonic Range Reading**: Reads front, left, and right distances from sensor trio 120.
+4. **Motion Command Generation**: Synthesizes linear and angular velocities for differential drive 150.
+
+### 3.6. Hybrid Navigation & Motion Control (`src/navigation.js` & `src/robot.js`)
 Combines reactive and deliberative path planning:
 1. **Artificial Potential Fields (APF)**:
    $$\vec{F}_{\text{net}} = w_g \vec{F}_{\text{goal}} + w_r \vec{F}_{\text{radar}} + w_{\text{rep}} \vec{F}_{\text{repulsion}} + w_m \vec{F}_{\text{momentum}}$$

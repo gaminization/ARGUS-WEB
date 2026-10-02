@@ -1,16 +1,46 @@
 cff-version: 1.2.0
-message: "If you use ARGUS-SIM in academic research or technical demonstrations, please cite it as below."
-title: "ARGUS-X: Autonomous Radar-Centric Search & Rescue Robot Simulation"
+message: "If you use this system or software in academic research, technical demonstrations, or intellectual property evaluations, please cite the Indian Patent publication and repository as below."
+title: "Autonomous radar-guided survivor detection and navigation system"
 authors:
-  - name: "ARGUS Robotics Team"
+  - family-names: "Arora"
+    given-names: "Garv"
+    affiliation: "Vellore Institute of Technology"
+    alias: "Lead Inventor & System Architect"
+  - family-names: "Padma Priya"
+    given-names: "R"
+    affiliation: "Vellore Institute of Technology"
+    alias: "Faculty Advisor / Academic Guidance"
 repository-code: "https://github.com/gaminization/ARGUS-SIM"
 keywords:
   - "autonomous navigation"
   - "search and rescue"
   - "mmwave radar"
+  - "respiration micro-motion detection"
+  - "probabilistic confidence mapping"
   - "artificial potential fields"
   - "occupancy grid"
   - "robotics simulation"
+  - "indian patent in202641072249"
 license: "MIT"
 version: "1.0.0"
-date-released: "2026-10-02"
+date-released: "2026-06-19"
+identifiers:
+  - type: other
+    value: "IN202641072249 A1"
+    description: "Indian Patent Registry Publication No."
+  - type: other
+    value: "Application No. 202641072249"
+    description: "Indian Patent Application Filing Number"
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "Arora"
+      given-names: "Garv"
+    - family-names: "Padma Priya"
+      given-names: "R"
+  title: "Autonomous radar-guided survivor detection and navigation system"
+  year: 2026
+  month: 6
+  institution:
+    name: "Indian Patent Office"
+  notes: "Invented by Garv Arora under the academic guidance of Prof. Padma Priya R at Vellore Institute of Technology. Patent Publication No. IN202641072249 A1, Application No. 202641072249, Filing Date: 10-06-2026, Publication Date: 19-06-2026, Journal No. 25/2026."

@@ -2,6 +2,14 @@
 
 This document provides in-depth mathematical formulations and algorithmic breakdowns of the navigation, perception, and mapping pipelines implemented in the **ARGUS-X** simulation.
 
+> **Intellectual Property Notice**: The algorithms documented herein represent the **original mathematical formulations, confidence decay laws, and navigation techniques developed by Garv Arora** (under the academic guidance of **Prof. Padma Priya R** at **Vellore Institute of Technology**). These algorithms were reduced to practice in this simulation and form the core claims of **Indian Patent Publication IN202641072249 A1** (*"Autonomous radar-guided survivor detection and navigation system"*), published 19 June 2026. Key patented claims derived from this work include:
+> - **Claims 1 & 4**: Confidence increment $C = \min(1.0, C + 0.12 \times r)$ and decay $C = \max(0, C - \beta \times \Delta t)$
+> - **Claims 2, 3 & 10**: State machine transitions at $C \ge 0.72$ and multi-angle directional sweeps
+> - **Claim 6**: SLAM-free, camera-free, LiDAR-free ultrasonic wall-following and IMU dead reckoning
+> - **Claim 7**: Micro-motion respiration vital detection through obstacles
+> - **Claim 8**: Neighbouring cell grouping and aggregate confidence ranking
+> - **Claim 9**: 10 Hz fixed-rate periodic control loop
+
 ---
 
 ## 1. Artificial Potential Fields (APF)
@@ -102,47 +110,82 @@ Raw radar returns enter a FIFO queue with a physical transport delay $\tau = 240
 
 ---
 
-## 4. Persistent Occupancy & Spatial Heatmap Mapping
+## 4. Probabilistic Confidence Mapping (Patent Claims 1 & 4)
 
-### 4.1. Inverse Sensor Raycasting
+### 4.1. Confidence Increment Formula (Claim 4 & [0069])
+The processing unit maintains a 2D grid map (**200**) of confidence scores $C \in [0.0, 1.0]$. When a radar detection is associated with a given cell:
+
+$$C_{t} = \min\left(1.0, \; C_{t-1} + 0.12 \times r\right)$$
+
+where:
+- $C$ represents the cell confidence score.
+- $r$ represents the reliability factor associated with the radar detection (accounting for signal strength, SNR, and multi-frame consistency).
+
+### 4.2. Time-Based Confidence Decay Formula (Claim 4 & [0070])
+In the absence of further radar detections associated with the cell:
+
+$$C_{t} = \max\left(0.0, \; C_{t-1} - \beta \times \Delta t\right)$$
+
+where:
+- $\beta$ is the decay coefficient.
+- $\Delta t$ is the elapsed time interval since the last update.
+
+This ensures that stale or transient multipath reflections fade away, preventing false positives while allowing sustained respiration signatures to build certainty.
+
+### 4.3. Four-Tier Heatmap Shading Representation Scale ([0071], [0093])
+The spatial confidence map is visualized and categorized according to a 4-tier shading hierarchy:
+
+| Confidence Range | Patent Shading Representation | Interpretation |
+| :--- | :--- | :--- |
+| **$0.00 \le C < 0.25$** | Dotted / Light Shading | Background ambient noise / unverified space |
+| **$0.25 \le C < 0.50$** | Cross-Hatched Shading | Tentative / low confidence detection |
+| **$0.50 \le C < 0.75$** | Diagonal Line Shading | Moderate confidence candidate target |
+| **$0.75 \le C \le 1.00$** | Dark / Solid Black Shading | Confirmed high confidence survivor location |
+
+Cells exhibiting peak probability based on breathing pattern detection are marked with distinct visual indicators (pink target indicators).
+
+### 4.4. Inverse Sensor Raycasting & Occupancy
 Ultrasonic range measurements are converted into spatial occupancy via Bresenham-style ray rasterization:
 - Cells along the ray up to $d - 4\text{ px}$ are marked as `explored = 1`.
 - The cell at ray termination distance $d$ (if hit occurs) is flagged as `obstacle = 1`.
 
-### 4.2. Mean-Reverting Bayesian Probability Density
-The continuous survivor probability grid $P(x, y)$ updates each step:
-
-$$P_{t+1}(i) = \text{clamp}\Big(P_t(i) \cdot \lambda_{\text{decay}} + P_{\text{ambient}}(i) \cdot (1 - \lambda_{\text{decay}}), 0, 1\Big)$$
-
-where $\lambda_{\text{decay}} = 0.999$, ensuring that old or spurious radar hits gradually fade toward the ambient uncertainty floor $P_{\text{ambient}} \approx 0.13 \pm 0.05$.
-
-When active radar returns occur:
-$$P_{t+1}(i) \leftarrow \text{clamp}\left(P_t(i) + \gamma_{\text{radar}} \cdot S_{\text{total}} \cdot \max\left(0, \hat{u}_{\text{sensor}} \cdot \hat{u}_{\text{cell}}\right) \cdot \Delta t \cdot 60, 0, 1\right)$$
-
-### 4.3. 2D Separable Gaussian Smoothing
+### 4.5. 2D Separable Gaussian Smoothing
 Every $\Delta t_{\text{blur}} = 0.24\text{ s}$, a 5-tap 1D separable Gaussian kernel is applied horizontally and vertically:
 
 $$K = \frac{1}{16} [1, 4, 6, 4, 1]$$
 
-This diffuses spatial discretization artifacts and forms coherent probability contours for downstream clustering.
+This diffuses spatial discretization artifacts and forms smooth confidence contours.
 
-### 4.4. Confirmed Target Suppression
-Upon survivor verification, a radial Gaussian damping window ($r = 80\text{ px}$) suppresses the probability grid back to ambient levels:
+### 4.6. Confirmed Target Suppression
+Upon survivor verification, a radial Gaussian damping window ($r = 80\text{ px}$) suppresses the local probability grid back toward ambient levels to prevent orbiting previously logged targets:
 
 $$P(i) \leftarrow P(i) \cdot (1 - \text{pull}) + P_{\text{ambient}}(i) \cdot \text{pull}, \quad \text{pull} = 0.18 \left(1 - \frac{d}{r}\right) \Delta t \cdot 60$$
 
-This prevents the robot from getting trapped orbiting previously rescued victims.
-
 ---
 
-## 5. Spatial Density Clustering
+## 5. Candidate Grouping, Multi-Angle Sweeps & Priority Ranking (Patent Claims 2, 8 & 10)
 
+### 5.1. Neighbouring Cell Grouping (Claim 8)
 Contiguous regions of high survivor likelihood are extracted via 8-connected flood-fill:
-1. Identify all seed cells where $P(x, y) \ge T_{\text{cluster}} = 0.56$.
-2. For each connected component, compute the weighted centroid:
-   $$\bar{x} = \frac{\sum_{k} x_k \cdot P_k}{\sum_{k} P_k}, \quad \bar{y} = \frac{\sum_{k} y_k \cdot P_k}{\sum_{k} P_k}$$
-3. Assign confidence $C = \max_k(P_k)$ and size $N = \text{cell count}$.
-4. Sort candidates descending by confidence. Top clusters become tracking candidates for state transitions.
+1. Identify all cells where confidence exceeds detection threshold $T_{\text{detection}} = 0.56$.
+2. Group adjacent high-confidence cells into candidate survivor clusters.
+3. Compute weighted spatial centroid for each cluster:
+   $$\bar{x} = \frac{\sum_{k} x_k \cdot C_k}{\sum_{k} C_k}, \quad \bar{y} = \frac{\sum_{k} y_k \cdot C_k}{\sum_{k} C_k}$$
+
+### 5.2. Aggregate Confidence Score & Priority Ranking (Claim 8 & [0091]–[0094])
+For each candidate survivor cluster, the system computes an aggregate confidence score:
+$$C_{\text{aggregate}} = \frac{1}{|K|} \sum_{k \in K} C_k \quad \text{or} \quad \sum_{k \in K} w_k C_k$$
+
+A prioritized **ranking table** is generated (Rank ID, Candidate ID, Aggregate Score, Position) so rescue teams can prioritize operational entry based on detection certainty.
+
+### 5.3. Directional Sweep & Multi-Angle Triangulation (Claims 2 & 10, [0086]–[0089])
+When any cell confidence exceeds the first threshold ($C \ge 0.72$):
+1. Robot pauses forward exploration.
+2. Performs a directional sweep across discrete angular intervals relative to the current IMU heading:
+   $$\Theta_{\text{sweep}} \in \{-90^\circ, -60^\circ, -45^\circ, -30^\circ, -15^\circ, 0^\circ, +15^\circ, +30^\circ, +45^\circ, +60^\circ, +90^\circ, 180^\circ\}$$
+   or a full $360^\circ$ rotation.
+3. Correlates multi-angle radar returns with IMU heading for triangulation, verifying true respiration micro-motion against single-angle multipath artifacts.
+4. If confidence remains above second threshold, logs GPS NMEA coordinates + grid position.
 
 ---
 

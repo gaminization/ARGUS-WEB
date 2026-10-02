@@ -2,6 +2,12 @@
 
 This document provides a comprehensive technical reference for the classes, data structures, and utility functions in the `src/` codebase.
 
+> **Intellectual Property Alignment**: This API documents the **original robotics software modules and simulation architecture created by Garv Arora** (under the academic guidance of **Prof. Padma Priya R** at **Vellore Institute of Technology**). These modules provided the reduction to practice upon which **Indian Patent Publication IN202641072249 A1** (*"Autonomous radar-guided survivor detection and navigation system"*, published 19 June 2026) was filed. Each module implements the core subsystems of the patented invention:
+> - `src/sensors.js`: Models Radar Sensor (110), Ultrasonic Sensors (120), IMU (130), and GPS module.
+> - `src/mapping.js`: Maintains Probabilistic Grid Map (200) with confidence increment and decay (Claims 1, 4, 8).
+> - `src/stateMachine.js`: Implements the 3-state patent FSM (Exploration, Confirmation, Logging) mapped to 5 runtime modes (Claims 2, 3, 10).
+> - `src/navigation.js` & `src/robot.js`: Executes SLAM-free autonomous wall-following and potential fields (Claims 5, 6).
+
 ---
 
 ## 1. Module Index
@@ -10,12 +16,12 @@ This document provides a comprehensive technical reference for the classes, data
 | :--- | :--- | :--- |
 | [`src/config.js`](file:///home/gaminizer/Projects/ARGUS-SIM/src/config.js) | `CONFIG`, Math utilities | Central simulation parameters, physical constants, and scoring weights. |
 | [`src/environment.js`](file:///home/gaminizer/Projects/ARGUS-SIM/src/environment.js) | `Environment` | Procedural rubble arena, boundary walls, and survivor target placement. |
-| [`src/robot.js`](file:///home/gaminizer/Projects/ARGUS-SIM/src/robot.js) | `Robot` | Differential drive kinematics, velocity smoothing, and stuck detection. |
-| [`src/sensors.js`](file:///home/gaminizer/Projects/ARGUS-SIM/src/sensors.js) | `SensorSuite` | Raycast sonar, 24GHz FMCW vital radar, 6-DoF IMU, and noisy GPS. |
-| [`src/mapping.js`](file:///home/gaminizer/Projects/ARGUS-SIM/src/mapping.js) | `MappingSystem` | Occupancy grid, Bayesian probability density, and spatial clustering. |
-| [`src/navigation.js`](file:///home/gaminizer/Projects/ARGUS-SIM/src/navigation.js) | `NavigationSystem` | Artificial Potential Fields, A\* frontier planner, and escape recovery. |
-| [`src/stateMachine.js`](file:///home/gaminizer/Projects/ARGUS-SIM/src/stateMachine.js) | `BehaviorStateMachine` | 5-phase behavioral finite state machine. |
-| [`src/renderer.js`](file:///home/gaminizer/Projects/ARGUS-SIM/src/renderer.js) | `Renderer` | Dual-canvas 2D real-time visualizer for world view and probability map. |
+| [`src/robot.js`](file:///home/gaminizer/Projects/ARGUS-SIM/src/robot.js) | `Robot` | Differential drive kinematics (150), chassis platform (100), and stuck detection. |
+| [`src/sensors.js`](file:///home/gaminizer/Projects/ARGUS-SIM/src/sensors.js) | `SensorSuite` | Raycast sonar (120), 24GHz FMCW vital radar (110), 6-DoF IMU (130), and GPS. |
+| [`src/mapping.js`](file:///home/gaminizer/Projects/ARGUS-SIM/src/mapping.js) | `MappingSystem` | Probabilistic grid map (200), confidence update/decay (Claims 1, 4), and clustering (Claim 8). |
+| [`src/navigation.js`](file:///home/gaminizer/Projects/ARGUS-SIM/src/navigation.js) | `NavigationSystem` | Artificial Potential Fields, frontier search, and trap recovery without SLAM (Claim 6). |
+| [`src/stateMachine.js`](file:///home/gaminizer/Projects/ARGUS-SIM/src/stateMachine.js) | `BehaviorStateMachine` | Threshold-driven state machine: Explore, Wall-Follow, Track, Confirm, Replay (Claim 2). |
+| [`src/renderer.js`](file:///home/gaminizer/Projects/ARGUS-SIM/src/renderer.js) | `Renderer` | Dual-canvas 2D real-time visualizer for world view and 4-tier probability map. |
 | [`src/replay.js`](file:///home/gaminizer/Projects/ARGUS-SIM/src/replay.js) | `ReplayBuffer` | Ring-buffer telemetry recorder and deterministic time-scrubber. |
 | [`src/logger.js`](file:///home/gaminizer/Projects/ARGUS-SIM/src/logger.js) | `Logger` | Tagged circular log buffer with timestamp formatting. |
 | [`src/utils.js`](file:///home/gaminizer/Projects/ARGUS-SIM/src/utils.js) | Vector & PRNG helpers | 2D vector algebra, Mulberry32 PRNG, and spatial distance metrics. |
